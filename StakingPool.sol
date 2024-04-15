@@ -54,14 +54,14 @@ contract StakingPool is Context, Ownable, ReentrancyGuard {
     event DepositRewards(uint256 pid, address indexed user, uint256 amountTokens);
     event DistributeReward(uint256 pid, address indexed user, uint256 amount, bool _wasCompounded);
 
-    // pool 0: 14 days, 1.5% (1209600, 150), 20% (2000)
-    // pool 1: 28 days, 12.5% (2419200, 1250), 30% (3000)
-    // pool 2: 56 days, 86% (4838400, 8600), 40% (4000)
-    constructor(address _token, uint256[] memory _lockupPeriod, uint256[] memory _percentage, uint256[] memory _fee) {
+    // pool 0: 14 days, 0% (1209600, 150, 15**34), 40% (4000)
+    // pool 1: 28 days, 0% (2419200, 1250, 35**34), 30% (3000)
+    // pool 2: 56 days, 0% (4838400, 8600, 60**34), 20% (2000)
+    constructor(address _token, uint256[] memory _lockupPeriod, uint256[] memory _percentage, uint256[] memory _rps, uint256[] memory _fee) {
         token = _token;
         require(_lockupPeriod.length == _percentage.length, "INVALID_LENGTH");
         for (uint8 _i; _i < _lockupPeriod.length; _i++) {
-            createPool(_lockupPeriod[_i], _percentage[_i], 0, _fee[_i]);
+            createPool(_lockupPeriod[_i], _percentage[_i], _rps[_i], _fee[_i]);
         }
     }
 
@@ -69,7 +69,7 @@ contract StakingPool is Context, Ownable, ReentrancyGuard {
         return pools;
     }
 
-    function createPool(uint256 _lockupSeconds, uint256 _percentage, uint8 _addedAPR, uint256 _fee) public onlyOwner {
+    function createPool(uint256 _lockupSeconds, uint256 _percentage, uint256 _rps, uint256 _fee) public onlyOwner {
         require(_totalPercentages + _percentage <= FACTOR, "max percentage");        
         _totalPercentages += _percentage;
         pools.push(
@@ -78,14 +78,14 @@ contract StakingPool is Context, Ownable, ReentrancyGuard {
                 percentage: _percentage,
                 totalStakedUsers: 0,
                 totalSharesDeposited: 0,
-                rewardsPerShare: 0,
+                rewardsPerShare: _rps,
                 totalDistributed: 0,
                 totalRewards: 0,
                 fee: _fee
             })
         );
         if (address(extension) != address(0)) {
-            try extension.addTokenPool(_addedAPR) {} catch {}
+            try extension.addTokenPool(_rps) {} catch {}
         }
         emit CreatePool(pools.length - 1);
     }
